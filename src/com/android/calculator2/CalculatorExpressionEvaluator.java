@@ -63,11 +63,10 @@ public class CalculatorExpressionEvaluator {
             // expr is not a simple number
         }
 */
-            if (expr.length() == 0)  
-	    {
-                callback.onEvaluate(expr, null, Calculator.INVALID_RES_ID);
-                return;
-            }
+        if (expr.length() == 0) {
+            callback.onEvaluate(expr, null, Calculator.INVALID_RES_ID);
+            return;
+        }
 
         try {
             double result = mSymbols.eval(expr);
@@ -87,6 +86,6 @@ public class CalculatorExpressionEvaluator {
     }
 
     public interface EvaluateCallback {
-        public void onEvaluate(String expr, String result, int errorResourceId);
+        void onEvaluate(String expr, String result, int errorResourceId);
     }
 }
