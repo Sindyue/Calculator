@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2014 The Android Open Source Project
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+  -->
+
+<com.android.calculator2.CalculatorPadLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pad_numeric"
+    style="@style/PadLayoutStyle.Numeric"
+    android:background="@color/pad_numeric_background_color"
+    android:columnCount="3"
+    android:rowCount="4">
+
+    <Button
+        android:id="@+id/digit_7"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_7" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit7"/>
+
+    <Button
+        android:id="@+id/digit_8"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_8" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit8"/>
+
+    <Button
+        android:id="@+id/digit_9"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_9" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit9"/>
+
+    <Button
+        android:id="@+id/digit_4"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_4"   
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit4"/>
+
+    <Button
+        android:id="@+id/digit_5"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_5" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit5"/>
+
+    <Button
+        android:id="@+id/digit_6"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_6" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit6"/>
+
+    <Button
+        android:id="@+id/digit_1"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_1" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit1"/>
+
+    <Button
+        android:id="@+id/digit_2"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_2"   
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit2"/>
+
+    <Button
+        android:id="@+id/digit_3"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_3" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit3"/>
+
+    <Button
+        android:id="@+id/dec_point"
+        android:onClick="onButtonClick"
+        android:tag="@string/dec_point" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/function_dot"/>
+
+    <Button
+        android:id="@+id/digit_0"
+        android:onClick="onButtonClick"
+        android:tag="@string/digit_0" 
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/btn_digit0"/>
+
+    <Button
+        android:id="@+id/eq"
+        android:contentDescription="@string/desc_eq"
+        android:onClick="onButtonClick"
+        android:tag="@string/eq"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/function_equal"/>
+
+</com.android.calculator2.CalculatorPadLayout>
