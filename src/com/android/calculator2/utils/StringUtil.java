@@ -79,7 +79,6 @@ public class StringUtil {
             return str;
         }
         try {
-
             if (str.equals(".")) {
                 return "0.00";
             }
