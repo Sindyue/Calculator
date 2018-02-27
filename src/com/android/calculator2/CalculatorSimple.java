@@ -49,6 +49,8 @@ import com.android.calculator2.utils.StringUtil;
 
 import java.lang.ref.WeakReference;
 
+import static com.android.calculator2.R.id.result;
+
 public class CalculatorSimple extends Activity implements OnTextSizeChangeListener, EvaluateCallback {
 
     private static final String NAME = CalculatorSimple.class.getName();
@@ -132,7 +134,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         mHandler = new MyHandler(this);
 
         mFormulaEditText = (CalculatorEditText) findViewById(R.id.formula);
-        mResultEditText = (CalculatorEditText) findViewById(R.id.result);
+        mResultEditText = (CalculatorEditText) findViewById(result);
         mResultEtNew = (CalculatorEditText) findViewById(R.id.result_et);
 
         mEqualButton = findViewById(R.id.pad_numeric).findViewById(R.id.eq);
@@ -164,7 +166,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
 
         outState.putInt(KEY_CURRENT_STATE, mCurrentState.ordinal());
         outState.putString(KEY_CURRENT_EXPRESSION,
-                mTokenizer.getNormalizedExpression(mFormulaEditText.getText().toString()));
+                mTokenizer.getNormalizedExpression(currentExpression));
     }
 
     private void setState(CalculatorState state) {
@@ -184,17 +186,29 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                 break;
             case R.id.op_add:
             case R.id.op_sub:
-                currentExpression = currentExpression + currentInputString;
-                currentInputString = currentInputString + currentInputChar;
-                //mFormulaEditText.append(view.getTag().toString());/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
+                //如果当前表达式不为
+                if (!TextUtils.isEmpty(currentExpression)) {
+                    //如果上次点击的符号和此次相同，则返回，不同则替换
+                    String lastChar = currentExpression.substring(currentExpression.length() - 1);
+                    if (lastChar.equals(currentInputChar)) {
+                        return;
+                    } else if (!TextUtils.isDigitsOnly(lastChar)) {
+                        currentExpression = currentExpression.substring(0, currentExpression.length() - 1) + currentInputChar;
+                    } else {
+                        currentExpression = currentExpression + currentInputChar;
+                    }
+                } else {
+                    currentExpression = currentExpression + currentInputChar;
+                }
                 mEvaluator.evaluate(currentExpression, CalculatorSimple.this);
                 //// TODO: 2018/2/26  点击加减号时，计算结果，并保留此时的运算符
                 isInputNew = true;
-                mResultEtNew.setText(StringUtil.DecimalFormat2(currentResult));
+                //mResultEtNew.setText(StringUtil.DecimalFormat2(currentResult));
                 break;
             case R.id.dec_point: //点，点击点后，替换点后面的字符串
                 if (isInputNew) {
                     currentInputString = currentInputChar;
+                    currentExpression = currentExpression + currentInputChar;
                     isInputNew = false;
                 } else {
                     if (currentInputString.contains(".")) {
@@ -202,6 +216,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                         return;
                     } else {
                         currentInputString = currentInputString + currentInputChar;
+                        currentExpression = currentExpression + currentInputChar;
                         mResultEtNew.setText(StringUtil.DecimalFormat2(currentInputString));
                     }
                 }
@@ -212,6 +227,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                         return;
                     }
                     currentInputString = currentInputChar;
+                    currentExpression = currentExpression + currentInputChar;
                     isInputNew = false;
                 } else {
                     if (currentInputString.contains(".")) {
@@ -225,9 +241,11 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                             return;
                         } else {
                             currentInputString = currentInputString + currentInputChar;
+                            currentExpression = currentExpression + currentInputChar;
                         }
                     } else if (currentInputString.length() < 10) {
                         currentInputString = currentInputString + currentInputChar;
+                        currentExpression = currentExpression + currentInputChar;
                     } else {
                         showMaxToast();
                         return;
@@ -252,6 +270,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         if (mCurrentState == CalculatorState.INPUT) {
             currentResult = result;
             mResultEditText.setText(result);
+            mResultEtNew.setText(StringUtil.DecimalFormat2(result));
         } else if (errorResourceId != INVALID_RES_ID) {
             onError(errorResourceId);
         } else if (!TextUtils.isEmpty(result)) {
@@ -291,6 +310,10 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     }
 
     private void onEquals() {
+//        if (!currentInputString.equals(currentExpression)) {
+//            currentExpression = currentExpression + currentInputString;
+//        }
+
         if (mCurrentState == CalculatorState.INPUT) {
             setState(CalculatorState.EVALUATE);
             mEvaluator.evaluate(currentExpression, this);
@@ -302,10 +325,12 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     }
 
     private void onClear() {
+        isInputNew = true;
         currentExpression = "0";  //当前输入的表达式
         currentInputString = "0"; //当前输入的字符串
         mResultEtNew.setText("0.00");
-        isInputNew = true;
+        mResultEditText.setText("0.00");
+        mFormulaEditText.setText("0.00");
     }
 
     private void onError(final int errorResourceId) {
@@ -344,6 +369,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         mResultEditText.setText(result);
         // Finally update the formula to use the current result.
         mFormulaEditText.setText(result);
+        mResultEtNew.setText(StringUtil.DecimalFormat2(result));
         setState(CalculatorState.RESULT);
     }
 
