@@ -47,6 +47,8 @@ import com.android.calculator2.CalculatorEditText.OnTextSizeChangeListener;
 import com.android.calculator2.CalculatorExpressionEvaluator.EvaluateCallback;
 import com.android.calculator2.utils.StringUtil;
 
+import java.lang.ref.WeakReference;
+
 public class CalculatorSimple extends Activity implements OnTextSizeChangeListener, EvaluateCallback {
 
     private static final String NAME = CalculatorSimple.class.getName();
@@ -127,7 +129,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_calculator_port_simple);
 
-        mContext = this;
+        mHandler = new MyHandler(this);
 
         mFormulaEditText = (CalculatorEditText) findViewById(R.id.formula);
         mResultEditText = (CalculatorEditText) findViewById(R.id.result);
@@ -314,7 +316,6 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
             return;
         }
 
-        /** M: [ALPS01798852] Cannot start this animator on a detached or null view @{ */
         if (mEqualButton != null && mEqualButton.isAttachedToWindow()) {
             setState(CalculatorState.ERROR);
             currentResult = getString(errorResourceId);
@@ -352,7 +353,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     protected final static int MAX_DIGITS_ALERT = 0;
     protected final static int MAX_INPUT_ALERT = 1;
     protected final static int TOAST_INTERVAL = 500;
-    private Handler mHandler = new Handler(new Handler.Callback() {
+    /*private Handler mHandler = new Handler(new Handler.Callback() {
         @Override
         public boolean handleMessage(Message msg) {
             switch (msg.what) {
@@ -370,7 +371,39 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
             }
             return false;
         }
-    });
+    });*/
+    private MyHandler mHandler;
+
+    private static class MyHandler extends Handler {
+
+        WeakReference<CalculatorSimple> mActivity;
+
+        private MyHandler(CalculatorSimple activity) {
+            mActivity = new WeakReference<>(activity);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            CalculatorSimple activity = mActivity.get();
+            if (activity == null) {
+                return;
+            }
+
+            switch (msg.what) {
+                case MAX_DIGITS_ALERT:
+                    Toast.makeText(activity, R.string.max_digits_alert,
+                            Toast.LENGTH_SHORT).show();
+                    break;
+                case MAX_INPUT_ALERT:
+                    Toast.makeText(activity, R.string.max_input_alert,
+                            Toast.LENGTH_SHORT).show();
+                    break;
+                default:
+                    throw new IllegalArgumentException("Invalid message.what = "
+                            + msg.what);
+            }
+        }
+    }
 
     public void vibrate() {
         Vibrator vibrator = (Vibrator) this.getSystemService(VIBRATOR_SERVICE);
