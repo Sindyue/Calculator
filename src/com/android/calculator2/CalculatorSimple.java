@@ -37,6 +37,7 @@ import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnKeyListener;
@@ -46,6 +47,7 @@ import android.widget.Toast;
 
 import com.android.calculator2.CalculatorEditText.OnTextSizeChangeListener;
 import com.android.calculator2.CalculatorExpressionEvaluator.EvaluateCallback;
+import com.android.calculator2.utils.StringUtil;
 
 public class CalculatorSimple extends Activity implements OnTextSizeChangeListener, EvaluateCallback {
 
@@ -78,7 +80,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         @Override
         public void afterTextChanged(Editable editable) {
             setState(CalculatorState.INPUT);
-            mEvaluator.evaluate(editable, CalculatorSimple.this);
+            //mResultEtNew.setText(StringUtil.DecimalFormat2(editable.toString()));
         }
     };
 
@@ -115,13 +117,19 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                 public CharSequence filter(CharSequence source, int start, int end,
                                            Spanned dest,
                                            int dstart, int dend) {
+                    Log.i("wyy", "filter: TextUtils.isDigitsOnly(source) = " + TextUtils.isDigitsOnly(source) + ", start = " + start
+                            + ", end = " + end + ", source = " + source + ", dstart = " + dstart + ", dend = " + dend);
                     //判断只能最大输入10位数字的
                     if (mCurrentState == CalculatorState.INPUT) {
                         int keep = MAX_INPUT_CHARACTERS - (dest.length() - (dend - dstart));
+                        Log.i("wyy", "filter: keep = " + keep + ", dest.length() = " + dest.length() + ", dstart = " + dstart + ", dend = " + dend);
                         if (keep >= end - start) {
+                            //当前输入的字符为数字
                             if (TextUtils.isDigitsOnly(source)) {
                                 int digitKeep = MAX_SUCCESSIVE_DIGITS
                                         - (getCountLen(dest, dstart, dend) - (dend - dstart));
+
+                                Log.i("wyy", "filter: digitKeep = " + digitKeep + ",getCountLen(dest, dstart, dend)= " + getCountLen(dest, dstart, dend) + ", dstart = " + dstart + ", dend = " + dend);
                                 if (digitKeep >= end - start) {
                                     return null;
                                 } else {
@@ -130,6 +138,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                                     vibrate();
                                     return "";
                                 }
+                                //当前输入的字符为非数字，此处为点
                             } else {
                                 //是否含有多个小数点或小数点后位数超过 2 位
                                 /*String dValue = dest.toString();
@@ -184,7 +193,6 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private CalculatorExpressionTokenizer mTokenizer;
     private CalculatorExpressionEvaluator mEvaluator;
 
-    private View mDisplayView;
     private CalculatorEditText mFormulaEditText;
     private CalculatorEditText mResultEditText;
     private CalculatorEditText mResultEtNew;  //新需求的内容显示
@@ -193,13 +201,13 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private boolean isInputNew = true;      //用于控制显示新输入的数字还是计算结果
     private String currentResult = "";      //当前输入的表达式计算结果
     private String currentExpression = "";  //当前输入的表达式
+    private String currentInputString = ""; //当前输入的字符串
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_calculator_port_simple);
 
-        mDisplayView = findViewById(R.id.display);
         mFormulaEditText = (CalculatorEditText) findViewById(R.id.formula);
         mResultEditText = (CalculatorEditText) findViewById(R.id.result);
         mResultEtNew = (CalculatorEditText) findViewById(R.id.result_et);
@@ -220,13 +228,9 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         mEvaluator.evaluate(mFormulaEditText.getText(), this);
 
         mFormulaEditText.setEditableFactory(mFormulaEditableFactory);
-        mFormulaEditText.addTextChangedListener(mFormulaTextWatcher);
+        mResultEtNew.addTextChangedListener(mFormulaTextWatcher);
         mFormulaEditText.setOnKeyListener(mFormulaOnKeyListener);
         mFormulaEditText.setOnTextSizeChangeListener(this);
-        /** M: add input length limitation @{ */
-        mFormulaEditText.setFilters(inputFilter);
-        mResultEtNew.setFilters(inputFilter);
-        /** @} */
     }
 
     @Override
@@ -247,6 +251,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     }
 
     public void onButtonClick(View view) {
+        String currentInputChar = view.getTag().toString();
         switch (view.getId()) {
             case R.id.eq:
                 onEquals();
@@ -256,25 +261,62 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                 break;
             case R.id.op_add:
             case R.id.op_sub:
-                currentExpression = currentExpression + view.getTag().toString();
+                currentExpression = currentExpression + currentInputString;
+                currentInputString = currentInputString + currentInputChar;
                 //mFormulaEditText.append(view.getTag().toString());/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
                 mEvaluator.evaluate(currentExpression, CalculatorSimple.this);
                 //// TODO: 2018/2/26  点击加减号时，计算结果，并保留此时的运算符
                 isInputNew = true;
-                mResultEtNew.setText(currentResult);
+                mResultEtNew.setText(StringUtil.DecimalFormat2(currentResult));
                 break;
-            default://数字或点
-                currentExpression = currentExpression + view.getTag().toString();
-                String strTemp = view.getTag().toString();
-                //mFormulaEditText.append(strTemp);/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
-                if (isInputNew) {
-                    isInputNew = false;
-                    mResultEtNew.setText(strTemp);
+            case R.id.dec_point: //点，点击点后，替换点后面的字符串
+                if (currentInputString.contains(".")) {
+                    showMaxToast();
+                    return;
                 } else {
-                    mResultEtNew.append(strTemp);
+                    currentInputString = currentInputString + currentInputChar;
+                    mResultEtNew.setText(StringUtil.DecimalFormat2(currentInputString));
                 }
                 break;
+            default://数字
+                if (isInputNew) {
+                    if (currentInputChar.equals("0")) {
+                        return;
+                    }
+                    currentInputString = currentInputChar;
+                    isInputNew = false;
+                } else {
+                    if (currentInputString.contains(".")) {
+                        int index = currentInputString.indexOf(".");
+                        //小数点后超过两位或者小数点前超过10位，直接返回
+                        if (currentInputString.substring(0, index).length() > 10) {
+                            showMaxToast();
+                            return;
+                        } else if (currentInputString.substring(index, currentInputString.length() - 1).length() >= 2) {
+                            showMaxToast();
+                            return;
+                        } else {
+                            currentInputString = currentInputString + currentInputChar;
+                        }
+                    } else if (currentInputString.length() < 10) {
+                        currentInputString = currentInputString + currentInputChar;
+                    } else {
+                        showMaxToast();
+                        return;
+                    }
+                }
+                mResultEtNew.setText(StringUtil.DecimalFormat2(currentInputString));
+                break;
         }
+    }
+
+    /**
+     * 显示达到最大值的限定
+     */
+    private void showMaxToast() {
+        mHandler.removeMessages(MAX_DIGITS_ALERT);
+        mHandler.sendEmptyMessageDelayed(MAX_DIGITS_ALERT, TOAST_INTERVAL);
+        vibrate();
     }
 
     @Override
@@ -323,24 +365,19 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private void onEquals() {
         if (mCurrentState == CalculatorState.INPUT) {
             setState(CalculatorState.EVALUATE);
-            mEvaluator.evaluate(mFormulaEditText.getText(), this);
+            mEvaluator.evaluate(currentExpression, this);
         }
         //// TODO: 2018/2/26   “=”号键切换为“完成”键
         isInputNew = true;
-        mResultEtNew.setText(currentResult);
+
+        mResultEtNew.setText(StringUtil.DecimalFormat2(currentResult));
     }
 
     private void onClear() {
-
-        currentExpression = "";
-        currentResult = "";
-        mResultEtNew.getEditableText().clear();
-
-        if (TextUtils.isEmpty(mFormulaEditText.getText())) {
-            return;
-        }
-
-        mFormulaEditText.getEditableText().clear();
+        currentExpression = "0";  //当前输入的表达式
+        currentInputString = "0"; //当前输入的字符串
+        mResultEtNew.setText("0.00");
+        isInputNew = true;
     }
 
     private void onError(final int errorResourceId) {
