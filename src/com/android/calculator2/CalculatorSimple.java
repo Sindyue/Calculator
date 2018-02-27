@@ -27,17 +27,15 @@ import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Vibrator;
 import android.support.annotation.NonNull;
 import android.text.Editable;
-import android.text.InputFilter;
-import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnKeyListener;
@@ -109,86 +107,6 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         }
     };
 
-    private InputFilter[] inputFilter = new InputFilter[]{
-            new InputFilter.LengthFilter(MAX_INPUT_CHARACTERS) {
-                private static final int MAX_SUCCESSIVE_DIGITS = 10;
-
-                @Override
-                public CharSequence filter(CharSequence source, int start, int end,
-                                           Spanned dest,
-                                           int dstart, int dend) {
-                    Log.i("wyy", "filter: TextUtils.isDigitsOnly(source) = " + TextUtils.isDigitsOnly(source) + ", start = " + start
-                            + ", end = " + end + ", source = " + source + ", dstart = " + dstart + ", dend = " + dend);
-                    //判断只能最大输入10位数字的
-                    if (mCurrentState == CalculatorState.INPUT) {
-                        int keep = MAX_INPUT_CHARACTERS - (dest.length() - (dend - dstart));
-                        Log.i("wyy", "filter: keep = " + keep + ", dest.length() = " + dest.length() + ", dstart = " + dstart + ", dend = " + dend);
-                        if (keep >= end - start) {
-                            //当前输入的字符为数字
-                            if (TextUtils.isDigitsOnly(source)) {
-                                int digitKeep = MAX_SUCCESSIVE_DIGITS
-                                        - (getCountLen(dest, dstart, dend) - (dend - dstart));
-
-                                Log.i("wyy", "filter: digitKeep = " + digitKeep + ",getCountLen(dest, dstart, dend)= " + getCountLen(dest, dstart, dend) + ", dstart = " + dstart + ", dend = " + dend);
-                                if (digitKeep >= end - start) {
-                                    return null;
-                                } else {
-                                    mHandler.removeMessages(MAX_DIGITS_ALERT);
-                                    mHandler.sendEmptyMessageDelayed(MAX_DIGITS_ALERT, TOAST_INTERVAL);
-                                    vibrate();
-                                    return "";
-                                }
-                                //当前输入的字符为非数字，此处为点
-                            } else {
-                                //是否含有多个小数点或小数点后位数超过 2 位
-                                /*String dValue = dest.toString();
-                                Pattern p = Pattern.compile("[0-9]*");
-                                // 删除等特殊字符，直接返回
-                                if ("".equals(source.toString())) {
-                                    return null;
-                                }
-                                //验证非数字或者小数点的情况
-                                Matcher m = p.matcher(source);
-                                if (dValue.contains(".")) {
-                                    //已经存在小数点的情况下，只能输入数字
-                                    if (!m.matches()) {
-                                        return null;
-                                    }
-                                } else {
-                                    //未输入小数点的情况下，可以输入小数点和数字
-                                    if (!m.matches() && !source.equals(".")) {
-                                        return null;
-                                    }
-                                }*/
-                                return null;
-                            }
-                        } else {
-                            mHandler.removeMessages(MAX_INPUT_ALERT);
-                            mHandler.sendEmptyMessageDelayed(MAX_INPUT_ALERT, TOAST_INTERVAL);
-                            vibrate();
-                            return "";
-                        }
-                    } else {
-                        return null;
-                    }
-                }
-
-                private int getCountLen(Spanned str, int start, int end) {
-                    int len = str.length();
-                    for (int i = len - 1; i > 0; i--) {
-                        if (!Character.isDigit(str.charAt(i))) {
-                            if (start <= i && i <= end) {
-                                continue;
-                            } else {
-                                len = len - (i + 1);
-                                break;
-                            }
-                        }
-                    }
-                    return len;
-                }
-            }};
-
     private CalculatorState mCurrentState;
     private CalculatorExpressionTokenizer mTokenizer;
     private CalculatorExpressionEvaluator mEvaluator;
@@ -202,11 +120,14 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private String currentResult = "";      //当前输入的表达式计算结果
     private String currentExpression = "";  //当前输入的表达式
     private String currentInputString = ""; //当前输入的字符串
+    private Context mContext;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_calculator_port_simple);
+
+        mContext = this;
 
         mFormulaEditText = (CalculatorEditText) findViewById(R.id.formula);
         mResultEditText = (CalculatorEditText) findViewById(R.id.result);
@@ -270,12 +191,17 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                 mResultEtNew.setText(StringUtil.DecimalFormat2(currentResult));
                 break;
             case R.id.dec_point: //点，点击点后，替换点后面的字符串
-                if (currentInputString.contains(".")) {
-                    showMaxToast();
-                    return;
+                if (isInputNew) {
+                    currentInputString = currentInputChar;
+                    isInputNew = false;
                 } else {
-                    currentInputString = currentInputString + currentInputChar;
-                    mResultEtNew.setText(StringUtil.DecimalFormat2(currentInputString));
+                    if (currentInputString.contains(".")) {
+                        showMaxToast();
+                        return;
+                    } else {
+                        currentInputString = currentInputString + currentInputChar;
+                        mResultEtNew.setText(StringUtil.DecimalFormat2(currentInputString));
+                    }
                 }
                 break;
             default://数字
@@ -390,29 +316,17 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
 
         /** M: [ALPS01798852] Cannot start this animator on a detached or null view @{ */
         if (mEqualButton != null && mEqualButton.isAttachedToWindow()) {
-            /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 begin*/
-            /*reveal(mEqualButton, R.color.calculator_error_color,
-                    new AnimatorListenerAdapter() {
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            setState(CalculatorState.ERROR);
-                            mResultEditText.setText(errorResourceId);
-                        }
-                    });*/
             setState(CalculatorState.ERROR);
             currentResult = getString(errorResourceId);
             mResultEditText.setText(errorResourceId);
-            /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
         } else {
             currentResult = getString(errorResourceId);
             mResultEditText.setText(errorResourceId);
-            return;
         }
-        /** @} */
     }
 
     private void onResult(final String result) {
-// Use a value animator to fade to the final text color over the course of the animation.
+        // Use a value animator to fade to the final text color over the course of the animation.
         final int resultTextColor = mResultEditText.getCurrentTextColor();
         final int formulaTextColor = mFormulaEditText.getCurrentTextColor();
         final ValueAnimator textColorAnimator =
@@ -438,24 +352,25 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     protected final static int MAX_DIGITS_ALERT = 0;
     protected final static int MAX_INPUT_ALERT = 1;
     protected final static int TOAST_INTERVAL = 500;
-    private Handler mHandler = new Handler() {
-        public void handleMessage(Message msg) {
+    private Handler mHandler = new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(Message msg) {
             switch (msg.what) {
                 case MAX_DIGITS_ALERT:
-                    Toast.makeText(CalculatorSimple.this, R.string.max_digits_alert,
+                    Toast.makeText(mContext, R.string.max_digits_alert,
                             Toast.LENGTH_SHORT).show();
                     break;
                 case MAX_INPUT_ALERT:
-                    Toast.makeText(CalculatorSimple.this, R.string.max_input_alert,
+                    Toast.makeText(mContext, R.string.max_input_alert,
                             Toast.LENGTH_SHORT).show();
                     break;
                 default:
                     throw new IllegalArgumentException("Invalid message.what = "
                             + msg.what);
             }
+            return false;
         }
-
-    };
+    });
 
     public void vibrate() {
         Vibrator vibrator = (Vibrator) this.getSystemService(VIBRATOR_SERVICE);
@@ -463,5 +378,4 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
             vibrator.vibrate(new long[]{100, 100}, -1);
         }
     }
-    /** @} */
 }
