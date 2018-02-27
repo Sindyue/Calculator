@@ -21,15 +21,12 @@
 
 package com.android.calculator2;
 
-import android.animation.Animator;
-import android.animation.Animator.AnimatorListener;
 import android.animation.AnimatorSet;
 import android.animation.ArgbEvaluator;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.app.Activity;
-import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -43,8 +40,6 @@ import android.text.TextWatcher;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.View.OnKeyListener;
-import android.view.ViewAnimationUtils;
-import android.view.ViewGroupOverlay;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -112,6 +107,79 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         }
     };
 
+    private InputFilter[] inputFilter = new InputFilter[]{
+            new InputFilter.LengthFilter(MAX_INPUT_CHARACTERS) {
+                private static final int MAX_SUCCESSIVE_DIGITS = 10;
+
+                @Override
+                public CharSequence filter(CharSequence source, int start, int end,
+                                           Spanned dest,
+                                           int dstart, int dend) {
+                    //判断只能最大输入10位数字的
+                    if (mCurrentState == CalculatorState.INPUT) {
+                        int keep = MAX_INPUT_CHARACTERS - (dest.length() - (dend - dstart));
+                        if (keep >= end - start) {
+                            if (TextUtils.isDigitsOnly(source)) {
+                                int digitKeep = MAX_SUCCESSIVE_DIGITS
+                                        - (getCountLen(dest, dstart, dend) - (dend - dstart));
+                                if (digitKeep >= end - start) {
+                                    return null;
+                                } else {
+                                    mHandler.removeMessages(MAX_DIGITS_ALERT);
+                                    mHandler.sendEmptyMessageDelayed(MAX_DIGITS_ALERT, TOAST_INTERVAL);
+                                    vibrate();
+                                    return "";
+                                }
+                            } else {
+                                //是否含有多个小数点或小数点后位数超过 2 位
+                                /*String dValue = dest.toString();
+                                Pattern p = Pattern.compile("[0-9]*");
+                                // 删除等特殊字符，直接返回
+                                if ("".equals(source.toString())) {
+                                    return null;
+                                }
+                                //验证非数字或者小数点的情况
+                                Matcher m = p.matcher(source);
+                                if (dValue.contains(".")) {
+                                    //已经存在小数点的情况下，只能输入数字
+                                    if (!m.matches()) {
+                                        return null;
+                                    }
+                                } else {
+                                    //未输入小数点的情况下，可以输入小数点和数字
+                                    if (!m.matches() && !source.equals(".")) {
+                                        return null;
+                                    }
+                                }*/
+                                return null;
+                            }
+                        } else {
+                            mHandler.removeMessages(MAX_INPUT_ALERT);
+                            mHandler.sendEmptyMessageDelayed(MAX_INPUT_ALERT, TOAST_INTERVAL);
+                            vibrate();
+                            return "";
+                        }
+                    } else {
+                        return null;
+                    }
+                }
+
+                private int getCountLen(Spanned str, int start, int end) {
+                    int len = str.length();
+                    for (int i = len - 1; i > 0; i--) {
+                        if (!Character.isDigit(str.charAt(i))) {
+                            if (start <= i && i <= end) {
+                                continue;
+                            } else {
+                                len = len - (i + 1);
+                                break;
+                            }
+                        }
+                    }
+                    return len;
+                }
+            }};
+
     private CalculatorState mCurrentState;
     private CalculatorExpressionTokenizer mTokenizer;
     private CalculatorExpressionEvaluator mEvaluator;
@@ -120,10 +188,11 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private CalculatorEditText mFormulaEditText;
     private CalculatorEditText mResultEditText;
     private CalculatorEditText mResultEtNew;  //新需求的内容显示
-    private View mClearButton;
     private View mEqualButton;
 
-    private boolean isInputNew = true;  //用于控制显示新输入的数字还是计算结果
+    private boolean isInputNew = true;      //用于控制显示新输入的数字还是计算结果
+    private String currentResult = "";      //当前输入的表达式计算结果
+    private String currentExpression = "";  //当前输入的表达式
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -134,7 +203,6 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         mFormulaEditText = (CalculatorEditText) findViewById(R.id.formula);
         mResultEditText = (CalculatorEditText) findViewById(R.id.result);
         mResultEtNew = (CalculatorEditText) findViewById(R.id.result_et);
-        mClearButton = findViewById(R.id.clr);
 
         mEqualButton = findViewById(R.id.pad_numeric).findViewById(R.id.eq);
         if (mEqualButton == null || mEqualButton.getVisibility() != View.VISIBLE) {
@@ -156,58 +224,8 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         mFormulaEditText.setOnKeyListener(mFormulaOnKeyListener);
         mFormulaEditText.setOnTextSizeChangeListener(this);
         /** M: add input length limitation @{ */
-        mFormulaEditText.setFilters(new InputFilter[]{
-                new InputFilter.LengthFilter(MAX_INPUT_CHARACTERS) {
-                    private static final int MAX_SUCCESSIVE_DIGITS = 10;
-
-                    @Override
-                    public CharSequence filter(CharSequence source, int start, int end,
-                                               Spanned dest,
-                                               int dstart, int dend) {
-                        if (mCurrentState == CalculatorState.INPUT) {
-                            int keep = getMax() - (dest.length() - (dend - dstart));
-                            if (keep >= end - start) {
-                                if (TextUtils.isDigitsOnly(source)) {
-                                    int digitKeep = MAX_SUCCESSIVE_DIGITS
-                                            - (getCountLen(dest, dstart, dend) - (dend - dstart));
-                                    if (digitKeep >= end - start) {
-                                        return null;
-                                    } else {
-                                        mHandler.removeMessages(MAX_DIGITS_ALERT);
-                                        mHandler.sendEmptyMessageDelayed(MAX_DIGITS_ALERT, TOAST_INTERVAL);
-                                        vibrate();
-                                        return "";
-                                    }
-                                } else {
-                                    return null;
-                                }
-                            } else {
-                                mHandler.removeMessages(MAX_INPUT_ALERT);
-                                mHandler.sendEmptyMessageDelayed(MAX_INPUT_ALERT, TOAST_INTERVAL);
-                                vibrate();
-                                return "";
-                            }
-                        } else {
-                            return null;
-                        }
-                    }
-
-                    private int getCountLen(Spanned str, int start, int end) {
-                        int len = str.length();
-                        for (int i = len - 1; i > 0; i--) {
-                            if (!Character.isDigit(str.charAt(i))) {
-                                if (start <= i && i <= end) {
-                                    continue;
-                                } else {
-                                    len = len - (i + 1);
-                                    break;
-                                }
-                            }
-                        }
-                        return len;
-                    }
-                }
-        });
+        mFormulaEditText.setFilters(inputFilter);
+        mResultEtNew.setFilters(inputFilter);
         /** @} */
     }
 
@@ -225,35 +243,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     private void setState(CalculatorState state) {
         if (mCurrentState != state) {
             mCurrentState = state;
-
-            if (state == CalculatorState.RESULT || state == CalculatorState.ERROR) {
-                //mClearButton.setVisibility(View.VISIBLE);
-            } else {
-                //mClearButton.setVisibility(View.GONE);
-            }
-
-            if (state == CalculatorState.ERROR) {
-                final int errorColor = getResources().getColor(R.color.calculator_error_color);
-                mFormulaEditText.setTextColor(errorColor);
-                mResultEditText.setTextColor(errorColor);
-                /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 begin*/
-                //getWindow().setStatusBarColor(errorColor);
-                /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
-            } else {
-                mFormulaEditText.setTextColor(
-                        getResources().getColor(R.color.display_formula_text_color));
-                mResultEditText.setTextColor(
-                        getResources().getColor(R.color.display_result_text_color));
-                /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 begin*/
-                //getWindow().setStatusBarColor(getResources().getColor(R.color.calculator_accent_color));
-                /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
-            }
         }
-    }
-
-    @Override
-    public void onUserInteraction() {
-        super.onUserInteraction();
     }
 
     public void onButtonClick(View view) {
@@ -261,30 +251,22 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
             case R.id.eq:
                 onEquals();
                 break;
-            case R.id.del:
-                onDelete();
-                break;
             case R.id.clr:
                 onClear();
                 break;
-            case R.id.fun_cos:
-            case R.id.fun_ln:
-            case R.id.fun_log:
-            case R.id.fun_sin:
-            case R.id.fun_tan:
-                // Add left parenthesis after functions.
-                mFormulaEditText.append(view.getTag().toString() + "("); /* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
-                break;
             case R.id.op_add:
             case R.id.op_sub:
-                mFormulaEditText.append(view.getTag().toString());/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
+                currentExpression = currentExpression + view.getTag().toString();
+                //mFormulaEditText.append(view.getTag().toString());/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
+                mEvaluator.evaluate(currentExpression, CalculatorSimple.this);
                 //// TODO: 2018/2/26  点击加减号时，计算结果，并保留此时的运算符
                 isInputNew = true;
-                mResultEtNew.setText(mResultEditText.getText().toString());
+                mResultEtNew.setText(currentResult);
                 break;
-            default:
+            default://数字或点
+                currentExpression = currentExpression + view.getTag().toString();
                 String strTemp = view.getTag().toString();
-                mFormulaEditText.append(strTemp);/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
+                //mFormulaEditText.append(strTemp);/* getText [BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 modify*/
                 if (isInputNew) {
                     isInputNew = false;
                     mResultEtNew.setText(strTemp);
@@ -298,6 +280,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     @Override
     public void onEvaluate(String expr, String result, int errorResourceId) {
         if (mCurrentState == CalculatorState.INPUT) {
+            currentResult = result;
             mResultEditText.setText(result);
         } else if (errorResourceId != INVALID_RES_ID) {
             onError(errorResourceId);
@@ -318,8 +301,8 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
             return;
         }
 
-        // Calculate the values needed to perform the scale and translation animations,
-        // maintaining the same apparent baseline for the displayed text.
+// Calculate the values needed to perform the scale and translation animations,
+// maintaining the same apparent baseline for the displayed text.
         final float textScale = oldSize / textView.getTextSize();
         final float translationX = (1.0f - textScale) *
                 (textView.getWidth() / 2.0f - textView.getPaddingEnd());
@@ -344,96 +327,26 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         }
         //// TODO: 2018/2/26   “=”号键切换为“完成”键
         isInputNew = true;
-        mResultEtNew.setText(mResultEditText.getText().toString());
-    }
-
-    private void onDelete() {
-        // Delete works like backspace; remove the last character from the expression.
-        final Editable formulaText = mFormulaEditText.getEditableText();
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
-        String oldText = mFormulaEditText.getEditableText().toString();
-        char delete_char = '\0'; 
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
-        final int formulaLength = formulaText.length();
-        if (formulaLength > 0) {
-            delete_char = oldText.charAt(formulaLength - 1); /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 add*/
-            formulaText.delete(formulaLength - 1, formulaLength);
-        }
-
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 begin*/
-        String newText = mFormulaEditText.getEditableText().toString();
-        int newTextLength = formulaText.length();
-        if (!newText.equals(formulaText) && newTextLength > 0) {
-            while (delete_char == '(' && newTextLength > 0 && newText.charAt(newTextLength - 1) <= 'z' && newText.charAt(newTextLength - 1) >= 'a' && newText.charAt(newTextLength - 1) != 'e') {
-                formulaText.delete(newTextLength - 1, newTextLength);
-                newTextLength--;
-            }
-        }
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
-    }
-
-    private void reveal(View sourceView, int colorRes, AnimatorListener listener) {
-        final ViewGroupOverlay groupOverlay =
-                (ViewGroupOverlay) getWindow().getDecorView().getOverlay();
-
-        final Rect displayRect = new Rect();
-        mDisplayView.getGlobalVisibleRect(displayRect);
-
-        // Make reveal cover the display and status bar.
-        final View revealView = new View(this);
-        revealView.setBottom(displayRect.bottom);
-        revealView.setLeft(displayRect.left);
-        revealView.setRight(displayRect.right);
-        revealView.setBackgroundColor(getResources().getColor(colorRes));
-        groupOverlay.add(revealView);
-
-        final int[] clearLocation = new int[2];
-        sourceView.getLocationInWindow(clearLocation);
-        clearLocation[0] += sourceView.getWidth() / 2;
-        clearLocation[1] += sourceView.getHeight() / 2;
-
-        final int revealCenterX = clearLocation[0] - revealView.getLeft();
-        final int revealCenterY = clearLocation[1] - revealView.getTop();
-
-        final double x1_2 = Math.pow(revealView.getLeft() - revealCenterX, 2);
-        final double x2_2 = Math.pow(revealView.getRight() - revealCenterX, 2);
-        final double y_2 = Math.pow(revealView.getTop() - revealCenterY, 2);
-        final float revealRadius = (float) Math.max(Math.sqrt(x1_2 + y_2), Math.sqrt(x2_2 + y_2));
-
-        final Animator revealAnimator =
-                ViewAnimationUtils.createCircularReveal(revealView,
-                        revealCenterX, revealCenterY, 0.0f, revealRadius);
-        revealAnimator.setDuration(
-                getResources().getInteger(android.R.integer.config_longAnimTime));
-
-        final Animator alphaAnimator = ObjectAnimator.ofFloat(revealView, View.ALPHA, 0.0f);
-        alphaAnimator.setDuration(
-                getResources().getInteger(android.R.integer.config_mediumAnimTime));
-        alphaAnimator.addListener(listener);
+        mResultEtNew.setText(currentResult);
     }
 
     private void onClear() {
+
+        currentExpression = "";
+        currentResult = "";
+        mResultEtNew.getEditableText().clear();
+
         if (TextUtils.isEmpty(mFormulaEditText.getText())) {
             return;
         }
 
-      /*  final View sourceView = mClearButton.getVisibility() == View.VISIBLE
-                ? mClearButton : mDeleteButton;*/
-       /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 begin*/
-        /*reveal(sourceView, R.color.calculator_accent_color, new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                mFormulaEditText.getEditableText().clear();
-            }
-        });*/
         mFormulaEditText.getEditableText().clear();
-        mResultEtNew.getEditableText().clear();
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
     }
 
     private void onError(final int errorResourceId) {
         if (mCurrentState != CalculatorState.EVALUATE) {
             // Only animate error on evaluate.
+            currentResult = getString(errorResourceId);
             mResultEditText.setText(errorResourceId);
             return;
         }
@@ -450,9 +363,11 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
                         }
                     });*/
             setState(CalculatorState.ERROR);
+            currentResult = getString(errorResourceId);
             mResultEditText.setText(errorResourceId);
             /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150326 end*/
         } else {
+            currentResult = getString(errorResourceId);
             mResultEditText.setText(errorResourceId);
             return;
         }
@@ -460,7 +375,7 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
     }
 
     private void onResult(final String result) {
-        // Use a value animator to fade to the final text color over the course of the animation.
+// Use a value animator to fade to the final text color over the course of the animation.
         final int resultTextColor = mResultEditText.getCurrentTextColor();
         final int formulaTextColor = mFormulaEditText.getCurrentTextColor();
         final ValueAnimator textColorAnimator =
@@ -473,18 +388,11 @@ public class CalculatorSimple extends Activity implements OnTextSizeChangeListen
         });
 
         // Finally update the formula to use the current result.
-        mFormulaEditText.setText(result);
-        setState(CalculatorState.RESULT);
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150505 begin*/
-        //animatorSet.start();
+        currentResult = result;
         mResultEditText.setText(result);
-        // Reset all of the values modified during the animation.
-        mResultEditText.setTextColor(resultTextColor);
         // Finally update the formula to use the current result.
         mFormulaEditText.setText(result);
         setState(CalculatorState.RESULT);
-        /*[BIRD_WEIMI_CALCULATOR] wangyueyue 20150505 end*/
-
     }
 
     /**
