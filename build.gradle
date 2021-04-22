@@ -16,19 +16,20 @@
 
 buildscript {
     repositories {
+        google()
+        jcenter()
         mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:2.3.1'
+        classpath 'com.android.tools.build:gradle:3.2.0'
     }
 }
 
 apply plugin: "com.android.application"
 
 android {
-    compileSdkVersion 25
-    buildToolsVersion "25.0.2"
+    compileSdkVersion 28
 
     defaultConfig {
         applicationId "com.apps.calculator"
@@ -51,10 +52,12 @@ android {
 }
 
 repositories {
-    mavenLocal()
+    google()
+    jcenter()
+    mavenCentral()
 }
 
 dependencies {
-    compile files("arity-2.1.2.jar")
-    compile "com.android.support:support-v4:+"
+    implementation files("arity-2.1.2.jar")
+    implementation "com.android.support:support-v4:+"
 }
